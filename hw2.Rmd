@@ -1,0 +1,166 @@
+---
+title: "HW2-QRM"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+#Exploratory Data Analysis for the data
+#Potential dependent variables: attack_p22, nkill_n_p22, and nwound_n_p22
+#the main independent variable:margin
+
+
+```{r}
+getwd()
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(hrbrthemes)
+library(stargazer)
+library(MASS)
+library(jtools)
+library(devtools)
+library(huxtable)
+
+
+load("TurkeyPKKvotes.rda")
+
+data <- dataNewC
+
+head(data)
+
+# Because of the error """"data` must be uniquely named but has duplicate columns"""". I drop the duplicated columns.
+
+duplicated_columns <- duplicated(colnames(data))
+duplicated_columns
+data <- data[!duplicated_columns]
+
+# Summaries and boxplots shows that potential dependent variables contain lots of zero "0".
+
+summary(unique(data$nkill_n_p2))
+summary(data$nkill_n_p2)
+
+summary(unique(data$attack_p22))
+summary(data$attack_p22)
+
+summary(unique(data$nwound_n_p22))
+summary(data$nwound_n_p22)
+
+ggplot(data, aes(x = attack_p22)) +
+  geom_density(fill="#69b3a2", color="#e9ecef", alpha= 0.8, binwidth = 10)
+
+ggplot(data, aes(x = attack_p22)) +
+  geom_histogram(binwidth = 5)
+
+ggplot(data, aes(x = nkill_n_p2)) +
+  geom_boxplot()
+ggplot(data, aes(x = nkill_n_p2)) +
+  geom_histogram(binwidth = 5)
+
+# No missing values or NAs in attack
+summary(data$attack_p22)
+sum(is.na(data$attack_p22))
+mean(is.na(data$attack_p22))
+
+# No missing values or NAs in margin.
+summary(data$margin)
+sum(is.na(data$margin))
+mean(is.na(data$margin))
+
+# I determined "nwound_n_p22" as my dependent variable. It is a count variable (# of attack incidents) 
+# that can take only values from 0 to infinity.
+
+# the main explanatory variable "margin" is numeric variable scaled from 0 to 1.
+# As it approaches to 1, this means that vote difference is increasing.   ??????????
+
+ggplot(data, aes(x = HHI)) +
+  geom_histogram(aes(varwidth=FALSE, alpha=30))
+
+ggplot(data, aes(x = margin)) +
+  geom_freqpoly()
+
+
+ggplot(data, aes(x = AKPvotes, y = attack_p22)) +
+  geom_point()
+
+
+
+
+data %>%
+  group_by(province) %>% 
+  summarise(mean_wound = mean(nwound_n_p22, na.rm = TRUE), mean_akp = mean(AKPvotes, na.rm = TRUE), mean_kurd = mean(Kurdishvote),
+            mean_margin = mean(margin)) %>%
+  arrange(desc(mean_margin))
+
+
+
+data %>%
+  group_by(province) %>% 
+  summarise(mean_wounded = mean(nwound_n_p22, na.rm = TRUE), prop_akp = mean(propAKP), prop_Kurd = mean(propKurd)) %>%
+  arrange(desc(prop_akp))
+
+head(data)
+
+
+
+# Potential control variables to add: validvotes2, AKPvotes, Kurdishvote, urbanization_rate, unemployment, province fixed effects?
+
+sum(is.na(data$validvotes2))
+sum(is.na(data$AKPvotes))
+sum(is.na(data$Kurdishvote))
+sum(is.na(data$urbanization_rate))
+sum(is.na(data$unemployment))
+
+```
+
+
+#Model Specification
+```{r}
+
+
+model = glm.nb(nwound_n_p22 ~ margin + border + validvotes2 + urbanization_rate + unemployment+ HHI + infant_mort_perthousand, data = data, control = glm.control(maxit = 1500, epsilon = 1e-8))
+
+attack_p22
+nwound_n_p22
+
+summary(model)
+
+stargazer(model)
+
+
+head(data)
+
+```
+
+#Justifying Controls
+```{r}
+
+
+dwplot(model, ci = .99)
+plot_summs(model)
+plot_summs(model, scale = TRUE, inner_ci_level = .95) # this code gives a good coefficient plot.
+tikz( 'myPlot.tex' )
+
+
+library(broom)
+coef = tidy(model, conf.int = T)
+coef
+ggplot(coef, aes(term, estimate))+
+  geom_point()+
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high))+
+  labs(title = "Coefficients of a GLM model")
+
+cor(data$margin, data$unemployment)
+
+head(data)
+
+as.integer(as.logical(data$border))
+
+data$border [data$border == "TRUE"] <- 1
+data$border [data$border == "FALSE"] <- 0
+
+head(data)
+
+```
+
